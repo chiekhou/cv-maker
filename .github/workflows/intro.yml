@@ -1,26 +1,91 @@
 name: Install and Build
 
+env:
+  VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+  VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+
 on:
   push:
 
 jobs:
-  hello-world:
-    runs-on : ubuntu-latest
+  build:
+    runs-on: ubuntu-latest
 
     steps:
-      - uses : actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Show node version
-        run : echo node -v
-      
+        run: echo node -v
+
       - name: Setup pnpm
         uses: pnpm/action-setup@v2.4.0
         with:
           version: 8
           run_install: false
 
-      - name : Install Dependencies
+      - name: Get pnpm store directory
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - uses: actions/cache@v3
+        name: Setup pnpm cache
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Install dependencies
         run: pnpm install
 
       - name: Build the app
         run: pnpm run build
+
+      - name: Test the connection
+        run: |
+              pnpm run preview &
+              sleep 5
+              curl -I http://localhost:4173
+
+      # - name: Notify
+      #   if: failure()
+      #   run: echo fail
+
+  # deploy:
+  #   runs-on: ubuntu-latest
+  #   needs: build
+
+  #   steps:
+  #     - uses: actions/checkout@v4
+
+  #     - name: Setup pnpm
+  #       uses: pnpm/action-setup@v2.4.0
+  #       with:
+  #         version: 8
+  #         run_install: false
+
+  #     - name: Get pnpm store directory
+  #       shell: bash
+  #       run: |
+  #         echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+  #     - uses: actions/cache@v3
+  #       name: Setup pnpm cache
+  #       with:
+  #         path: ${{ env.STORE_PATH }}
+  #         key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+  #         restore-keys: |
+  #           ${{ runner.os }}-pnpm-store-
+
+  #     - name: Install dependencies
+  #       run: pnpm install
+
+  #     - name: Netlify Deploy
+  #       uses: jsmrcaga/action-netlify-deploy@v2.0.0
+  #       with:
+  #         NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+  #         NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
+  #         build_command: pnpm run build
+  #         install_command: pnpm install
+    
